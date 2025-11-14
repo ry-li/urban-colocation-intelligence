@@ -1,3 +1,24 @@
+
+
+
+/* Color Notes */
+/* NYU Violet color #57068c */
+/* Ultra Violet color #8900e1 */
+:root{
+    --gr-white: #f2f2f2; /* light grey */
+    --bg-soft: #f2eefa;
+    --bg-soft-2: #eee5ff;
+    --bg-soft-3: #eeccff;
+    --bg-soft-4: #8e44ad; /* alternative purple */
+    --uviolet: #8900e1;
+    --violet: #57068c;
+    --ink: #333; /* dark grey */
+}
+
+
+
+
+
 html, body {
     margin: 0; /* Remove default margin */
     padding: 0; /* Remove default padding */
@@ -54,6 +75,25 @@ main {
 .about-project-text {
     margin-top: -1em; /* Remove space above the text */
 }
+
+
+/* Treemap Section */
+.treemap-iframe {
+    display: flex;
+    width: 90dvw; /* Set a fixed width for the treemap section */
+    max-width: 980px; /* Set a maximum width for larger screens */
+    height: 65dvh; /* Maintain aspect ratio */
+    justify-content: center; /* Center the treemap section */
+    align-items: center; /* Center vertically */
+    margin: 0 auto 4em; /* Center the treemap section */
+    padding: 0; /* Remove default padding */
+    background-color: var(--bg-soft); /* Light purple background */
+    border: none; /* Remove default border */
+    border-radius: 5px; /* Rounded corners */
+    box-shadow: 2px 3px 9px var(--bg-soft-2); /* Shadow effect */
+    overflow: auto; /* Enable scrolling if content overflows */
+}
+
 
 /* Team Members */
 .team-members {
