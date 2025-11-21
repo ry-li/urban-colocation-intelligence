@@ -1,6 +1,6 @@
-# Urban-Colocation-Intelligence
+# urban-colocation-intelligence
 
-https://r-li.com/Urban-Colocation-Intelligence/
+https://r-li.com/urban-colocation-intelligence/
 
 Topic: Urban Colocation Intelligence: Mapping Amenity Clusters and Dependency Networks Using Open-Source POI Data
 
