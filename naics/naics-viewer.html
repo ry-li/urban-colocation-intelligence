@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NAICS 2017 Interactive Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar for cleaner look */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+
+        /* Remove default summary marker and add custom one */
+        details > summary {
+            list-style: none;
+        }
+        details > summary::-webkit-details-marker {
+            display: none;
+        }
+        
+        /* Hierarchy lines */
+        .tree-line {
+            position: relative;
+        }
+        .tree-line::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: -12px;
+            width: 1px;
+            background-color: #e2e8f0;
+        }
+        
+        /* Rotation for arrow */
+        .arrow {
+            transition: transform 0.2s ease;
+        }
+        details[open] > summary .arrow {
+            transform: rotate(90deg);
+        }
+
+        /* Level coloring stripes */
+        .level-2-border { border-left: 4px solid #3b82f6; } /* Blue */
+        .level-3-border { border-left: 4px solid #10b981; } /* Emerald */
+        .level-4-border { border-left: 4px solid #f59e0b; } /* Amber */
+        .level-5-border { border-left: 4px solid #8b5cf6; } /* Violet */
+        .level-6-border { border-left: 4px solid #ec4899; } /* Pink */
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans h-screen flex flex-col overflow-hidden">
+
+    <!-- Header -->
+    <header class="bg-white border-b border-slate-200 p-4 shadow-sm z-10">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    NAICS 2017 Intelligence
+                </h1>
+                <p class="text-sm text-slate-500 mt-1">Interactive Hierarchical Data Viewer</p>
+            </div>
+            
+            <div class="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                <div class="relative w-full md:w-64">
+                    <input type="text" id="searchInput" placeholder="Search codes or titles..." 
+                        class="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400 absolute left-3 top-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+                <div class="flex gap-2">
+                    <button id="expandAllBtn" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors">
+                        Expand All
+                    </button>
+                    <button id="collapseAllBtn" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors">
+                        Collapse All
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Legend -->
+    <div class="bg-white border-b border-slate-100 py-2 px-4 text-xs overflow-x-auto">
+        <div class="max-w-7xl mx-auto flex gap-4 whitespace-nowrap">
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-blue-500"></span> Sector (2)</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> Subsector (3)</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-amber-500"></span> Industry Group (4)</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-violet-500"></span> NAICS Industry (5)</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-3 rounded-full bg-pink-500"></span> National Industry (6)</span>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-auto p-4 sm:p-6" id="mainContainer">
+        
+        <!-- Loading State -->
+        <div id="loader" class="flex flex-col items-center justify-center h-64 text-slate-500">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+            <p>Fetching NAICS data from repository...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="error" class="hidden flex flex-col items-center justify-center h-64 text-red-500 text-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <p id="errorMsg">Failed to load data.</p>
+            <button onclick="location.reload()" class="mt-4 text-blue-600 hover:underline">Try Again</button>
+        </div>
+
+        <!-- Tree Container -->
+        <div id="treeRoot" class="max-w-7xl mx-auto space-y-2 hidden">
+            <!-- Tree items will be injected here -->
+        </div>
+
+        <!-- Empty Search Result -->
+        <div id="noResults" class="hidden flex flex-col items-center justify-center h-64 text-slate-400">
+            <p>No codes found matching your search.</p>
+        </div>
+
+    </main>
+
+    <footer class="bg-white border-t border-slate-200 p-3 text-center text-xs text-slate-400">
+        Data Source: ry-li/urban-colocation-intelligence
+    </footer>
+
+    <script>
+        const DATA_URL = 'https://raw.githubusercontent.com/ry-li/urban-colocation-intelligence/refs/heads/main/naics/naisc-2017.csv';
+        let rawData = [];
+        let treeData = [];
+
+        // --- Initialization ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const csvText = await fetchData(DATA_URL);
+                rawData = parseCSV(csvText);
+                treeData = buildHierarchy(rawData);
+                renderTree(treeData, document.getElementById('treeRoot'));
+                
+                // Show content
+                document.getElementById('loader').classList.add('hidden');
+                document.getElementById('treeRoot').classList.remove('hidden');
+
+                // Event Listeners
+                setupSearch();
+                setupControls();
+
+            } catch (err) {
+                console.error(err);
+                document.getElementById('loader').classList.add('hidden');
+                const errorEl = document.getElementById('error');
+                errorEl.classList.remove('hidden');
+                document.getElementById('errorMsg').textContent = `Error: ${err.message}`;
+            }
+        });
+
+        // --- Data Fetching & Parsing ---
+
+        async function fetchData(url) {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            return await response.text();
+        }
+
+        function parseCSV(text) {
+            const lines = text.split(/\r?\n/);
+            const data = [];
+            // Assuming header exists, skip index 0 if it's "Code,Title" etc.
+            // Based on typical CSVs, we check if first line looks like header.
+            let startIndex = 0;
+            if (lines[0].toLowerCase().includes('code') && lines[0].toLowerCase().includes('title')) {
+                startIndex = 1;
+            }
+
+            for (let i = startIndex; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
+
+                // Simple regex to handle quoted commas if necessary, 
+                // though NAICS CSVs are usually simple: code, "title" or code, title
+                const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g); 
+                
+                // Fallback splitting for simple CSV if regex fails or is overkill
+                // The provided URL likely has standard format: `Code,Title` or `"Code","Title"`
+                // Let's do a robust split that respects quotes.
+                const parts = parseCSVLine(line);
+                
+                if (parts.length >= 2) {
+                    // Clean quotes
+                    const code = parts[0].replace(/^"|"$/g, '').trim();
+                    const title = parts[1].replace(/^"|"$/g, '').trim();
+                    if (code && title) {
+                        data.push({ code, title });
+                    }
+                }
+            }
+            return data;
+        }
+
+        function parseCSVLine(text) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current);
+            return result;
+        }
+
+        // --- Hierarchy Logic ---
+
+        function buildHierarchy(flatData) {
+            // Sort by code to ensure parents usually come before children, 
+            // but for ranges (31-33) we need special handling.
+            // Standard string sort works well for NAICS: 11, 111, 1111...
+            flatData.sort((a, b) => a.code.localeCompare(b.code));
+
+            const root = [];
+            const map = new Map();
+
+            // First pass: Index everything
+            flatData.forEach(item => {
+                // Determine level based on code length
+                // Special handling for ranges like '31-33' -> treat as 2-digit root
+                let level = item.code.length;
+                if (item.code.includes('-')) level = 2; // Range codes are effectively level 2 roots
+
+                map.set(item.code, { ...item, level, children: [] });
+            });
+
+            // Second pass: Link children to parents
+            map.forEach(item => {
+                const code = item.code;
+                
+                // Root Level
+                if (item.level === 2) {
+                    root.push(item);
+                    return;
+                }
+
+                // Find Parent
+                let parentCode = null;
+                
+                // Standard logic: parent is current code minus last digit
+                // e.g., 111 -> 11, 1111 -> 111
+                if (item.level > 2 && item.level <= 6) {
+                    parentCode = code.substring(0, code.length - 1);
+                }
+
+                // Special Case: Manufacturing (31-33)
+                // Codes starting with 31, 32, or 33 belong to parent '31-33' if '31', '32', '33' don't exist as roots.
+                // Actually, NAICS usually has '31-33' as the sector code.
+                // 3-digit subsectors like 311 parent is 31, but 31 might not exist, '31-33' is the parent.
+                if (!map.has(parentCode) && (code.startsWith('31') || code.startsWith('32') || code.startsWith('33'))) {
+                     if (map.has('31-33') && code.length === 3) {
+                         parentCode = '31-33';
+                     }
+                }
+                
+                // Fallback: Code 44-45 (Retail Trade)
+                if (!map.has(parentCode) && (code.startsWith('44') || code.startsWith('45'))) {
+                     if (map.has('44-45') && code.length === 3) {
+                         parentCode = '44-45';
+                     }
+                }
+
+                // Fallback: Code 48-49 (Transportation)
+                if (!map.has(parentCode) && (code.startsWith('48') || code.startsWith('49'))) {
+                     if (map.has('48-49') && code.length === 3) {
+                         parentCode = '48-49';
+                     }
+                }
+
+                if (parentCode && map.has(parentCode)) {
+                    map.get(parentCode).children.push(item);
+                } else {
+                    // Orphan nodes (shouldn't happen in clean NAICS, but just in case)
+                    // If it's a top level 2-digit distinct code, it's root.
+                    // If it's a 6 digit code without parent, we attach to root? No, leave as orphan or push to root if substantial.
+                    // For visualization safety, if no parent found and length > 2, treat as root but mark it?
+                    // Let's push to root to be safe so data isn't lost.
+                    root.push(item);
+                }
+            });
+
+            return root;
+        }
+
+        // --- Rendering ---
+
+        function renderTree(nodes, container) {
+            container.innerHTML = '';
+            nodes.forEach(node => {
+                container.appendChild(createNodeElement(node));
+            });
+        }
+
+        function createNodeElement(node) {
+            const hasChildren = node.children && node.children.length > 0;
+            
+            // Container for the item
+            const wrapper = document.createElement('div');
+            wrapper.className = 'my-1';
+            
+            // Determine styling based on level
+            const levelColors = {
+                2: 'border-blue-500 bg-blue-50',
+                3: 'border-emerald-500 bg-emerald-50',
+                4: 'border-amber-500 bg-amber-50',
+                5: 'border-violet-500 bg-violet-50',
+                6: 'border-pink-500 bg-pink-50'
+            };
+            
+            const badgeColors = {
+                2: 'bg-blue-100 text-blue-800',
+                3: 'bg-emerald-100 text-emerald-800',
+                4: 'bg-amber-100 text-amber-800',
+                5: 'bg-violet-100 text-violet-800',
+                6: 'bg-pink-100 text-pink-800'
+            };
+
+            const borderClass = `level-${node.level}-border`;
+
+            if (hasChildren) {
+                const details = document.createElement('details');
+                details.className = 'group rounded-lg overflow-hidden bg-white shadow-sm border border-slate-200';
+                details.dataset.code = node.code;
+                details.dataset.title = node.title.toLowerCase();
+
+                const summary = document.createElement('summary');
+                summary.className = `cursor-pointer p-3 hover:bg-slate-50 transition-colors flex items-center justify-between select-none ${borderClass}`;
+                
+                summary.innerHTML = `
+                    <div class="flex items-center gap-3 overflow-hidden">
+                        <span class="flex-shrink-0 w-4 h-4 text-slate-400 arrow">
+                            <svg fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg>
+                        </span>
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
+                            <span class="font-mono font-bold text-xs sm:text-sm px-2 py-0.5 rounded ${badgeColors[node.level] || 'bg-gray-100'} w-fit">
+                                ${node.code}
+                            </span>
+                            <span class="font-medium text-slate-700 text-sm sm:text-base truncate" title="${node.title}">${node.title}</span>
+                        </div>
+                    </div>
+                `;
+
+                const content = document.createElement('div');
+                content.className = 'pl-4 sm:pl-8 pr-2 pb-2 tree-line';
+                
+                // Recursively render children
+                node.children.forEach(child => {
+                    content.appendChild(createNodeElement(child));
+                });
+
+                details.appendChild(summary);
+                details.appendChild(content);
+                wrapper.appendChild(details);
+            } else {
+                // Leaf node (usually level 6)
+                const div = document.createElement('div');
+                div.className = `p-3 ml-2 rounded border border-slate-100 hover:bg-slate-50 flex items-center gap-3 ${borderClass} bg-white shadow-sm`;
+                div.dataset.code = node.code;
+                div.dataset.title = node.title.toLowerCase();
+                
+                div.innerHTML = `
+                    <span class="w-4"></span> <!-- spacer for arrow alignment -->
+                    <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 w-full">
+                        <span class="font-mono font-bold text-xs sm:text-sm px-2 py-0.5 rounded ${badgeColors[node.level] || 'bg-gray-100'} w-fit">
+                            ${node.code}
+                        </span>
+                        <span class="text-slate-600 text-sm sm:text-base truncate" title="${node.title}">${node.title}</span>
+                    </div>
+                `;
+                wrapper.appendChild(div);
+            }
+
+            return wrapper;
+        }
+
+        // --- Search & Controls ---
+
+        function setupSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const treeRoot = document.getElementById('treeRoot');
+            const noResults = document.getElementById('noResults');
+
+            searchInput.addEventListener('input', (e) => {
+                const term = e.target.value.toLowerCase();
+                
+                if (!term) {
+                    // Reset: show all, close deep levels, keep roots open? Or just reset style
+                    // Better to just remove hidden classes and highlight
+                    resetSearch();
+                    return;
+                }
+
+                let matchCount = 0;
+                
+                // Traverse DOM to find matches
+                const allDetails = treeRoot.querySelectorAll('details');
+                const allDivs = treeRoot.querySelectorAll('div[data-code]'); // leaf wrappers
+
+                // Helper to check text
+                const matches = (el) => {
+                    const c = el.dataset.code ? el.dataset.code.toLowerCase() : '';
+                    const t = el.dataset.title ? el.dataset.title.toLowerCase() : '';
+                    return c.includes(term) || t.includes(term);
+                };
+
+                // First pass: Hide everything top level, then reveal matches
+                // Actually, easier approach: 
+                // 1. Mark all matches.
+                // 2. Walk up from matches to open parents.
+                // 3. Hide non-matching roots/branches if filtering is strict.
+
+                // Strict filtering approach
+                const allNodes = treeRoot.querySelectorAll('details, div[data-code]');
+                allNodes.forEach(node => {
+                    if (node.tagName === 'DETAILS' || (node.tagName === 'DIV' && node.className.includes('shadow-sm'))) {
+                        node.classList.add('hidden');
+                    }
+                });
+
+                const leafNodes = treeRoot.querySelectorAll('div[data-code]'); // Leaves
+                const branchNodes = treeRoot.querySelectorAll('details[data-code]'); // Branches
+
+                // Check branches and leaves
+                const nodesToCheck = [...leafNodes, ...branchNodes];
+                
+                nodesToCheck.forEach(node => {
+                    if (matches(node)) {
+                        matchCount++;
+                        showNodeAndParents(node);
+                    }
+                });
+
+                if (matchCount === 0) {
+                    noResults.classList.remove('hidden');
+                } else {
+                    noResults.classList.add('hidden');
+                }
+            });
+        }
+
+        function showNodeAndParents(node) {
+            node.classList.remove('hidden');
+            
+            // If it's a details node and matched directly, we might want to open it? 
+            // Optional: node.open = true; 
+
+            // Walk up parents
+            let parent = node.parentElement;
+            while (parent && parent.id !== 'treeRoot') {
+                if (parent.tagName === 'DETAILS') {
+                    parent.classList.remove('hidden');
+                    parent.open = true; // Open path to match
+                }
+                if (parent.classList.contains('tree-line')) {
+                    // This is the content div inside details, ensure parent details shows
+                    parent.parentElement.classList.remove('hidden');
+                    parent.parentElement.open = true;
+                }
+                parent = parent.parentElement;
+            }
+        }
+
+        function resetSearch() {
+            const allNodes = document.querySelectorAll('#treeRoot details, #treeRoot div[data-code]');
+            allNodes.forEach(n => n.classList.remove('hidden'));
+            document.getElementById('noResults').classList.add('hidden');
+            
+            // Close all deep nodes, maybe keep top level open? 
+            // Let's just collapse all to restore sanity
+            // collapseAll();
+        }
+
+        function setupControls() {
+            document.getElementById('expandAllBtn').addEventListener('click', () => {
+                document.querySelectorAll('details').forEach(el => el.open = true);
+            });
+
+            document.getElementById('collapseAllBtn').addEventListener('click', () => {
+                document.querySelectorAll('details').forEach(el => el.open = false);
+            });
+        }
+
+    </script>
+</body>
+</html>
