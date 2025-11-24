@@ -81,9 +81,9 @@ main {
 /* NAICS section */
 .naics {
     display: flex;
+    text-align: center; /* Center the about project section */
     justify-content: center; /* Center the naics section */
     align-items: center; /* Center vertically */
-    text-align: center; /* Center the naics section text */
     flex-direction: column; /* Align items in a column */
     flex-wrap: wrap; /* Allow items to wrap to the next line if necessary */
     margin: 2em auto; /* Center the naics section */
