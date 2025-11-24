@@ -59,7 +59,7 @@
         <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900">NAICS Hierarchy Viewer</h1>
-                <p class="text-sm text-gray-500">Interactive 2017 Code Structure</p>
+                <p class="text-sm text-gray-500">Source: r-li.com</p>
             </div>
             
             <div class="flex gap-2 w-full md:w-auto">
@@ -88,18 +88,23 @@
                 </div>
             </div>
             
-            <h2 id="statusTitle" class="text-xl font-semibold mb-2">Attempting to load CSV...</h2>
+            <h2 id="statusTitle" class="text-xl font-semibold mb-2">Connecting to Data Source...</h2>
             
-            <p id="statusMessage" class="text-gray-600 mb-6">
-                Looking for <code>2017-NAICS.csv</code> in the current folder.
+            <p id="statusMessage" class="text-gray-600 mb-6 text-sm break-all">
+                Attempting to fetch: <br>
+                <code class="bg-gray-100 px-2 py-1 rounded">https://r-li.com/urban-colocation-intelligence/naics/naisc-2017.csv</code>
             </p>
 
             <!-- Fallback File Input -->
             <div id="manualUpload" class="hidden">
                 <div class="p-6 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-blue-50 transition cursor-pointer relative" id="dropZone">
                     <input type="file" id="fileInput" accept=".csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-                    <p class="text-sm text-gray-600 font-medium">Browser security blocked auto-loading.</p>
-                    <p class="text-xs text-gray-500 mt-1">Drag & Drop <strong>2017-NAICS.csv</strong> here or click to select.</p>
+                    <p class="text-sm text-gray-600 font-medium text-red-500 mb-2">Connection Blocked by Browser Security (CORS)</p>
+                    <p class="text-sm text-gray-600">The remote server does not allow direct browser access.</p>
+                    <p class="text-xs text-gray-500 mt-2">
+                        1. Download the file manually: <a href="https://r-li.com/urban-colocation-intelligence/naics/naisc-2017.csv" target="_blank" class="text-blue-600 underline">Click here</a><br>
+                        2. Drag & Drop the downloaded <strong>.csv</strong> here.
+                    </p>
                 </div>
             </div>
         </div>
@@ -112,21 +117,21 @@
     </main>
 
     <script>
-        const CSV_FILENAME = '2017-NAICS.csv';
+        const CSV_URL = 'https://r-li.com/urban-colocation-intelligence/naics/naisc-2017.csv';
         let rawData = [];
         let treeData = [];
 
         // --- Initialization ---
 
         window.addEventListener('DOMContentLoaded', async () => {
-            // Attempt to fetch automatically
+            // Attempt to fetch from URL
             try {
-                const response = await fetch(CSV_FILENAME);
-                if (!response.ok) throw new Error("File not found");
+                const response = await fetch(CSV_URL);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 const text = await response.text();
                 processCSV(text);
             } catch (err) {
-                console.log("Auto-fetch failed (likely CORS or file missing). Showing manual upload.");
+                console.warn("Auto-fetch failed. Likely CORS or network error.", err);
                 showManualUpload();
             }
         });
@@ -136,9 +141,9 @@
         function showManualUpload() {
             document.getElementById('spinner').classList.add('hidden');
             document.getElementById('uploadIcon').classList.remove('hidden');
-            document.getElementById('statusTitle').innerText = "File Access Needed";
+            document.getElementById('statusTitle').innerText = "Automatic Load Failed";
             document.getElementById('statusMessage').innerHTML = `
-                Browsers often block HTML files from reading local files automatically for security.
+                Could not automatically load from r-li.com.
             `;
             document.getElementById('manualUpload').classList.remove('hidden');
 
@@ -209,8 +214,7 @@
         }
 
         function buildHierarchy() {
-            // Sort by code to ensure parents usually come before children, 
-            // though the map approach below handles out-of-order mostly fine.
+            // Sort by code to ensure parents usually come before children
             rawData.sort((a, b) => a.code.localeCompare(b.code));
 
             const map = {};
@@ -239,12 +243,9 @@
                     if (map[parentCode]) {
                         map[parentCode].children.push(node);
                     } else {
-                        // Edge case: Sometimes a level is skipped in bad data, 
-                        // or it's a root 2-digit range masquerading.
-                        // For this dataset, we treat orphans > 2 digits as roots or handle strictly.
-                        // We will treat as root if parent missing, or could search up the chain.
-                        // Let's attach to closest existing ancestor for robustness?
-                        // For now, strict hierarchy:
+                        // Orphan handling: If parent doesn't exist, treat as root for now
+                        // or attach to closest ancestor. For simplicity, we treat as root 
+                        // if we strictly can't find the immediate parent, OR check 2-digit root.
                         roots.push(node); 
                     }
                 } else {
@@ -254,7 +255,7 @@
             });
 
             // Filter roots to only actual top-level items (Level 2)
-            // or orphans that couldn't find a parent.
+            // or orphans that strictly have no parent in the map
             treeData = roots.filter(n => n.level === 2 || !map[n.code.substring(0, n.code.length-1)]);
         }
 
@@ -348,49 +349,9 @@
         searchInput.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase();
             if (!term) {
-                // Reset to standard view (maybe collapse deeper levels, but keep top open? or just leave as is)
-                // For simplicity, we just unhide everything.
                 document.querySelectorAll('[data-code]').forEach(el => el.classList.remove('hidden'));
                 return;
             }
-
-            const allBranches = document.querySelectorAll('#treeRoot > div, .children-container > div'); // all branch divs
-            
-            allBranches.forEach(branch => {
-                const code = branch.dataset.code;
-                const title = branch.dataset.title;
-                
-                // Check if this specific node matches
-                const matches = code.includes(term) || title.includes(term);
-                
-                if (matches) {
-                    branch.classList.remove('hidden');
-                    // Walk up parents and expand them
-                    let parent = branch.parentElement; // .children-container
-                    while(parent && parent.id !== 'treeRoot') {
-                        if (parent.classList.contains('children-container')) {
-                            parent.classList.remove('collapsed');
-                            // Fix chevron
-                            const parentRow = parent.previousElementSibling;
-                            const chevron = parentRow.querySelector('.chevron svg');
-                            if(chevron) chevron.classList.add('rotate-90');
-                            
-                            // Ensure parent branch is visible
-                            parent.parentElement.classList.remove('hidden');
-                        }
-                        parent = parent.parentElement;
-                    }
-                } else {
-                    // Hide it, BUT check if it has matching children later?
-                    // The easiest CSS way: 
-                    // Hide everything initially.
-                    // If a node matches, show it and all ancestors.
-                    // This loop approach is tricky.
-                    // Let's use a recursive search on the Data Object instead for cleaner filtering.
-                }
-            });
-
-            // Better Search approach: Filter logic
             filterTree(term);
         });
 
@@ -413,7 +374,6 @@
             });
 
             // Second pass: Show parents of matches
-            // We select all matched nodes
             const matches = document.querySelectorAll('[data-match="true"]');
             matches.forEach(match => {
                 let parent = match.parentElement; // children-container
@@ -431,7 +391,6 @@
                         const parentBranch = parent.parentElement;
                         if(parentBranch) {
                             parentBranch.classList.remove('hidden');
-                            // don't set data-match to avoid infinite loop logic, just visual show
                         }
                     }
                     if (parent.id === 'treeRoot') break;
