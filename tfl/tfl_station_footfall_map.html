@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>TfL Station Footfall (Mar–Apr 2025) – Interactive Map</title>
 
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
+
   <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -46,15 +49,19 @@
     label { font-size: 12px; opacity: .9; }
     select, input[type="range"], button {
       background: rgba(255,255,255,0.06); color: #e8eef6;
-      border: 1px solid rgba(255,255,255,0.10); border-radius: 10px;
-      padding: 8px 10px; font-size: 12px;
+      font-size: 12px;
       outline: none;
     }
-    button { cursor: pointer; }
+    select, button {
+      padding: 8px 10px;
+      border: 1px solid rgba(255,255,255,0.10); border-radius: 10px;
+    }
+    input[type="range"] { padding: 8px 0px; }
+    button { cursor: pointer; margin-bottom: 4px; }
     button:hover { background: rgba(255,255,255,0.10); }
-    .pill { font-size: 11px; opacity:.85; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); }
+    .pill { font-size: 11px; text-align: center; opacity:.85; min-width: 95px; padding: 6px 8px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); }
     .muted { opacity: .8; }
-    .statline { display:flex; gap:10px; flex-wrap:wrap; font-size:12px; }
+    .statline { margin-top: 10px; display:flex; gap:10px; flex-wrap:wrap; font-size:12px; }
     .stat { padding: 8px 10px; border: 1px solid rgba(255,255,255,0.10); border-radius: 12px; background: rgba(255,255,255,0.05); }
     .stat b { font-size: 13px; }
 
@@ -110,7 +117,7 @@
     /* Data source box on-map */
     .datasource {
       position: absolute; left: 12px; bottom: 12px; right: 12px;
-      max-width: 820px;
+      max-width: 400px;
       background: rgba(14, 18, 24, 0.86); color: #e8eef6;
       border: 1px solid rgba(255,255,255,0.10);
       border-radius: 14px; padding: 10px 12px;
@@ -176,9 +183,6 @@
         <div style="flex: 1 1 240px;">
           <label for="day">Day</label><br/>
           <input id="day" type="range" min="0" max="0" value="0" step="1" style="width:100%;" />
-          <div class="muted" style="font-size:11px; margin-top:4px;">
-            <span id="dayLabel">—</span>
-          </div>
         </div>
         <div style="display:flex; gap:8px;">
           <button id="play">▶ Play</button>
@@ -212,11 +216,14 @@
 
   <div class="datasource" id="datasource">
     <b>Data sources:</b>
-    Aggregated station-level daily entries &amp; exits from TfL “Network demand data” (Station footfall 2024/25),
-    with station locations from TfL GIS Open Data Hub (stations layer).<br/>
-    This visualization loads:
-    <a href="https://raw.githubusercontent.com/ry-li/urban-colocation-intelligence/refs/heads/main/tfl/footfall_aggregate.csv" target="_blank" rel="noopener">footfall_aggregate.csv</a>.
-    Basemap © OpenStreetMap contributors, tiles by CARTO.
+    <br>
+    Station-level daily entries &amp; exits tap counts:
+    <a href="https://tfl.gov.uk/corporate/publications-and-reports/network-demand-data#on-this-page-2" target="_blank" rel="noopener">TfL Station footfall</a>
+    <br>
+    Station locations: TfL GIS Open Data Hub
+    <a href="https://gis-tfl.opendata.arcgis.com/maps/5dcb79b6817b4bf89732de68a0337312/about" target="_blank" rel="noopener"> TfL stations</a>
+    <br><br>
+    &copy; 2026 <a href="https://r-li.com" target="_blank" rel="noopener">Ruoyu Li</a></a> &nbsp;|&nbsp; <i class="fa-regular fa-file-code"></i> Repository: <a href="https://github.com/ry-li/urban-colocation-intelligence" target="_blank" rel="noopener">ry-li/urban-colocation-intelligence</a>
   </div>
 
 <script>
@@ -251,7 +258,6 @@
   const elMetric = document.getElementById("metric");
   const elRender = document.getElementById("renderMode");
   const elDay = document.getElementById("day");
-  const elDayLabel = document.getElementById("dayLabel");
   const elSubtitle = document.getElementById("subtitle");
   const elPill = document.getElementById("statusPill");
   const elStatDate = document.getElementById("statDate");
@@ -467,8 +473,7 @@
     const idx = +elDay.value;
     const metric = elMetric.value;
 
-    elDayLabel.textContent = `${prettyDate(dates[idx])} (${dateToLabel(dates[idx])})`;
-    elSubtitle.textContent = `${stations.length} stations · ${prettyDate(dates[0])} → ${prettyDate(dates[dates.length-1])}`;
+    elSubtitle.innerHTML = `${prettyDate(dates[0])} → ${prettyDate(dates[dates.length-1])}<br>Total number of stations: ${stations.length}`;
     elStatDate.textContent = prettyDate(dates[idx]);
     elStatStations.textContent = fmtInt(stations.length);
 
@@ -577,7 +582,7 @@
 
     // Update legend circles
     drawCircleLegend(rScale, metric);
-    elPill.textContent = `${metric.toUpperCase()} · ${dateToLabel(dates[idx])}`;
+    elPill.innerHTML = `Data on display:<br>${dateToLabel(dates[idx])}<br>${metric} tap count`;
   }
 
   function drawCircleLegend(rScale, metric) {
