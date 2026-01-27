@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>TfL Station Footfall (Mar–Apr 2025) – Interactive Map</title>
+  <title>TfL Station Footfall Interactive Map</title>
 
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/7.0.1/css/all.min.css">
@@ -41,8 +41,8 @@
       display:flex; align-items:center; justify-content:space-between; gap:10px;
       border-bottom: 1px solid rgba(255,255,255,0.08);
     }
-    .panel header .title { font-weight: 700; font-size: 14px; letter-spacing: .2px; }
-    .panel header .sub { opacity: .8; font-size: 12px; }
+    .panel header .title { font-weight: 700; font-size: 13px; letter-spacing: .2px; }
+    .panel header .sub { opacity: .8; font-size: 12px; margin-top: 10px; }
     .panel .content { padding: 12px 14px 14px 14px; }
     .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
     .row + .row { margin-top: 10px; }
@@ -89,6 +89,7 @@
     /* Legend */
     .legend {
       position: absolute; left: 12px; top: 16px;
+      text-align: center;
       background: rgba(14, 18, 24, 0.88); color: #e8eef6;
       border: 1px solid rgba(255,255,255,0.10);
       border-radius: 14px; padding: 10px 12px;
@@ -108,10 +109,9 @@
         rgb(253,174,97),
         rgb(215,25,28)
       );
-      border: 1px solid rgba(255,255,255,0.12);
     }
     .legend .gradlabels { display:flex; justify-content:space-between; font-size: 10px; opacity:.85; margin-top: 4px; }
-    .legend .circlewrap { margin-top: 10px; display:flex; gap:10px; align-items:center; }
+    .legend .circlewrap { display:flex; gap:10px; align-items:center; }
     .legend canvas { display:block; }
 
     /* Data source box on-map */
@@ -140,15 +140,14 @@
   <div id="map"></div>
 
   <div class="legend" id="legend">
-    <h2>Station “tide”</h2>
-    <div class="small">
-      Bubble size = selected day’s footfall<br/>
-      Bubble color = Entry−Exit imbalance (blue → more exits; red → more entries)
-    </div>
+    <h2>London Station “Tide”</h2>
+    <div class="small" style="margin-top:10px;"><b>Bubble Color</b> = Entry−Exit imbalance</div>
+    <div class="small" style="margin-top:6px;">blue ← more exits ｜ more entries → red</div>
     <div class="grad" aria-hidden="true"></div>
     <div class="gradlabels"><span>0% entry</span><span>50%</span><span>100% entry</span></div>
+    <div class="small" style="margin-top:20px;"><b>Bubble Size</b> = selected day’s footfall (tap count)<br/></div>
     <div class="circlewrap">
-      <canvas id="circleLegend" width="125" height="96"></canvas>
+      <canvas id="circleLegend" width="125" height="80"></canvas>
       <div class="small" id="circleLegendText"></div>
     </div>
   </div>
@@ -156,7 +155,7 @@
   <div class="panel" id="panel">
     <header>
       <div>
-        <div class="title">TfL station footfall (Mar–Apr 2025)</div>
+        <div class="title">London Tube and Rail Stations Footfall</div>
         <div class="sub muted" id="subtitle">Loading…</div>
       </div>
       <span class="pill" id="statusPill">…</span>
@@ -175,7 +174,6 @@
         <select id="renderMode">
           <option value="bubbles">Bubbles</option>
           <option value="heat">Heatmap</option>
-          <option value="both">Both</option>
         </select>
       </div>
 
@@ -215,6 +213,10 @@
   </div>
 
   <div class="datasource" id="datasource">
+    <b>About:</b>
+    <br>
+    The dataset includes Transport for London (TfL) stations on the <b>London Underground (Tube)</b>, <b>London Overground</b>, <b>DLR</b>, and <b>Elizabeth Line</b>. It displays daily entry and exit tap counts for each station.
+    <br><br>
     <b>Data sources:</b>
     <br>
     Station-level daily entries &amp; exits tap counts:
@@ -250,9 +252,6 @@
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'
     }
   ).addTo(map);
-
-  // Add a subtle London “focus” ring
-  const focus = L.circle([51.5074, -0.1278], { radius: 7000, color: "rgba(255,255,255,0.14)", weight: 1, fill: false }).addTo(map);
 
   // ---- UI elements ----
   const elMetric = document.getElementById("metric");
@@ -343,15 +342,9 @@
     return d3.scaleSqrt().domain([0, max || 1]).range([2, 28]);
   };
 
-  // color for imbalance (Entry vs Exit) or net sign
+  // Bubble color always shows Entry−Exit imbalance ratio (consistent across metrics)
+  // Blue = exit-heavy, Red = entry-heavy. (Amplitude is boosted to avoid everything clustering near neutral.)
   const colorFor = (entryVal, exitVal, netVal, metric) => {
-    // Use a diverging scale centered at 0 imbalance.
-    // Most stations have Entry≈Exit, so we amplify the imbalance to make color visible.
-    if (metric === "net") {
-      const denom = (globalMax.netAbs || 1);
-      const t = clamp01(0.5 + 0.5 * (netVal / denom));
-      return diverge(t);
-    }
     const tot = entryVal + exitVal;
     let delta = tot === 0 ? 0 : (entryVal - exitVal) / tot; // [-1, 1]
     const amp = 3.0; // visual amplification
@@ -369,19 +362,24 @@
 
   const popupHTML = (s, idx, metric) => {
     const e = s.entry[idx], x = s.exit[idx], t = s.total[idx], n = s.net[idx];
+    const share = (e + x) === 0 ? 0.5 : (e/(e+x));
+    const sharePct = Math.round(share*100);
     const label = dateToLabel(dates[idx]);
     const line1 = `<b style="font-size:13px;">${escapeHtml(s.name)}</b>`;
     const line2 = `<span class="muted">${escapeHtml(s.network)}${s.lines ? " · " + escapeHtml(s.lines) : ""}</span>`;
     const line3 = `<div class="mono" style="margin-top:6px; line-height:1.5;">
         <div><span class="muted">Date</span> <b>${label}</b></div>
         <div><span class="muted">Entry</span> <b>${fmtInt(e)}</b> &nbsp; <span class="muted">Exit</span> <b>${fmtInt(x)}</b></div>
+      </div>`;
+    const line4 = `<div class="mono" style="margin-top:6px; line-height:1.5;">
         <div><span class="muted">Total</span> <b>${fmtInt(t)}</b> &nbsp; <span class="muted">Net</span> <b>${fmtInt(n)}</b></div>
+        <div><span class="muted">Entry share</span> <b>${sharePct}%</b> &nbsp; <span class="muted">Imbalance</span> <b>${Math.round(((e-x)/(e+x||1))*100)}%</b></div>
       </div>`;
     const meta = `<div class="muted" style="margin-top:8px; font-size:11px;">
         ${s.accessibility ? escapeHtml(s.accessibility) : ""}
         ${s.nightTube ? (s.accessibility ? " · " : "") + "Night Tube: " + escapeHtml(s.nightTube) : ""}
       </div>`;
-    return `${line1}<br/>${line2}${line3}${meta}`;
+    return `${line1}<br/>${line2}${line3}${line4}${meta}`;
   };
 
   function escapeHtml(str) {
@@ -473,7 +471,7 @@
     const idx = +elDay.value;
     const metric = elMetric.value;
 
-    elSubtitle.innerHTML = `${prettyDate(dates[0])} → ${prettyDate(dates[dates.length-1])}<br>Total number of stations: ${stations.length}`;
+    elSubtitle.innerHTML = `${prettyDate(dates[0])} → ${prettyDate(dates[dates.length-1])}<br><br>Total number of stations: ${stations.length}`;
     elStatDate.textContent = prettyDate(dates[idx]);
     elStatStations.textContent = fmtInt(stations.length);
 
@@ -503,20 +501,24 @@
         weight: 1
       });
 
-      // Tooltip
-      const share = (e + x) === 0 ? 0.5 : (e/(e+x));
-      const sharePct = Math.round(share*100);
-      m.bindTooltip(
-        `<b>${escapeHtml(s.name)}</b><br/>
-         <span class="muted">${escapeHtml(s.network)}${s.lines ? " · " + escapeHtml(s.lines) : ""}</span><br/>
-         <span class="mono">Entry ${fmtInt(e)} · Exit ${fmtInt(x)} · Total ${fmtInt(t)} · Net ${fmtInt(n)}</span><br/>
-         <span class="muted">Entry share: ${sharePct}% · Imbalance: ${Math.round(((e-x)/(e+x||1))*100)}%</span>`,
-        { direction: "top", opacity: 0.95, sticky: true }
-      );
+      // // Tooltip
+      // const share = (e + x) === 0 ? 0.5 : (e/(e+x));
+      // const sharePct = Math.round(share*100);
+      // m.bindTooltip(
+      //   `<b>${escapeHtml(s.name)}</b><br/>
+      //    <span class="muted">${escapeHtml(s.network)}${s.lines ? " · " + escapeHtml(s.lines) : ""}</span><br/>
+      //    <span class="mono">Entry ${fmtInt(e)} · Exit ${fmtInt(x)} · Total ${fmtInt(t)} · Net ${fmtInt(n)}</span><br/>
+      //    <span class="muted">Entry share: ${sharePct}% · Imbalance: ${Math.round(((e-x)/(e+x||1))*100)}%</span>`,
+      //   { direction: "top", opacity: 0.95, sticky: true }
+      // );
 
-      // Heat point weight is always total; normalize later
-      heatPoints.push([s.geom.lat, s.geom.lon, t]);
-    });
+      // Heat point weight follows selected metric (net uses |net|); normalize later
+      const heatW = metric === "entry" ? e
+                : metric === "exit"  ? x
+                : metric === "net"   ? Math.abs(n)
+                : t;
+      heatPoints.push([s.geom.lat, s.geom.lon, heatW]);
+});
 
     elStatSum.textContent = fmtInt(sum);
 
@@ -525,25 +527,22 @@
       map.removeLayer(heatLayer);
       heatLayer = null;
     }
-    // Normalize weights a bit so the heatmap isn't dominated by a few stations
+// Normalize weights a bit so the heatmap isn't dominated by a few stations
     const wMax = d3.max(heatPoints, d => d[2]) || 1;
     const heatNorm = heatPoints.map(d => [d[0], d[1], Math.pow(d[2]/wMax, 0.65)]);
-    heatLayer = L.heatLayer(heatNorm, { radius: 22, blur: 18, maxZoom: 15 });
-
-    // Apply render mode
+    heatLayer = L.heatLayer(heatNorm, { radius: 22, blur: 18, maxZoom: map.getZoom() });
+// Apply render mode
     const mode = elRender.value;
+
     if (mode === "bubbles") {
       if (!map.hasLayer(bubbleLayer)) bubbleLayer.addTo(map);
-      if (map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
+      if (heatLayer && map.hasLayer(heatLayer)) map.removeLayer(heatLayer);
     } else if (mode === "heat") {
       if (map.hasLayer(bubbleLayer)) map.removeLayer(bubbleLayer);
-      heatLayer.addTo(map);
-    } else {
-      if (!map.hasLayer(bubbleLayer)) bubbleLayer.addTo(map);
-      heatLayer.addTo(map);
+      if (heatLayer && !map.hasLayer(heatLayer)) heatLayer.addTo(map);
     }
 
-    // Update selected station popup (if open) + spark
+// Update selected station popup (if open) + spark
     if (selected) {
       const m = markers.get(selected.id);
       if (m && m.getPopup()) m.setPopupContent(popupHTML(selected, idx, metric));
@@ -554,13 +553,13 @@
     const seriesKey = metric; // "entry" | "exit" | "total" | "net"
     const ranked = stations
       .map(s => {
+        const n = s.net[idx];
         const v = seriesKey === "entry" ? s.entry[idx]
                 : seriesKey === "exit"  ? s.exit[idx]
-                : seriesKey === "net"   ? Math.abs(s.net[idx])
+                : seriesKey === "net"   ? Math.abs(n)
                 : s.total[idx];
-        return { s, v };
-      })
-      .sort((a,b) => d3.descending(a.v, b.v))
+        return { s, v, n };
+      }).sort((a,b) => d3.descending(a.v, b.v))
       .slice(0, 12);
 
     elTopTitle.textContent = seriesKey === "net" ? "Top stations (|net|)" : `Top stations (${seriesKey})`;
@@ -574,7 +573,7 @@
           <div class="name">${escapeHtml(r.s.name)}</div>
           <div class="meta">${escapeHtml(meta || "")}</div>
         </div>
-        <div class="val mono">${fmtInt(Math.round(r.v))}</div>
+        <div class="val mono">${(seriesKey === "net" ? ((r.n >= 0 ? "+" : "-") + fmtInt(Math.round(r.v))) : fmtInt(Math.round(r.v)))}</div>
       `;
       div.addEventListener("click", () => selectStation(r.s));
       elTopList.appendChild(div);
@@ -582,6 +581,7 @@
 
     // Update legend circles
     drawCircleLegend(rScale, metric);
+    
     elPill.innerHTML = `Data on display:<br>${dateToLabel(dates[idx])}<br>${metric} tap count`;
   }
 
@@ -601,13 +601,12 @@
 
     const rMax = Math.max(...radii);
     const pad = 10;          // padding to canvas edge
-    const labelPadTop = 16;  // keep some space for the "size" label
     const baseX = 44;
 
     // Place the circle stack so the largest circle has padding at the bottom (no clipping)
     let baseY = c.height - pad - rMax;
     // Ensure there’s also room for the top label area
-    baseY = Math.max(baseY, labelPadTop + rMax);
+    baseY = Math.max(baseY, rMax);
 
     radii.slice().reverse().forEach((r) => {
       ctx.beginPath();
@@ -618,7 +617,6 @@
 
     ctx.fillStyle = "rgba(255,255,255,0.75)";
     ctx.font = "10px ui-sans-serif, system-ui";
-    ctx.fillText("size", 10, 12);
 
     const txt = document.getElementById("circleLegendText");
     const label = metric === "net" ? "≈ |net| max" : "≈ max";
@@ -652,12 +650,17 @@
   // ---- Wire controls ----
   elDay.min = 0;
   elDay.max = dates.length - 1;
-  elDay.value = Math.floor(dates.length / 2);
+  elDay.value = Math.floor(dates.length / 2.618); // golden ratio start
   elDay.addEventListener("input", () => update());
   elMetric.addEventListener("change", () => update());
   elRender.addEventListener("change", () => update());
 
-  // ---- Initial ----
+  // Rebuild heatmap on zoom so its intensity stays comparable at all zoom levels
+  map.on("zoomend", () => {
+    const mode = elRender.value;
+    if (mode === "heat") update();
+});
+// ---- Initial ----
   elPill.textContent = "Ready";
   update();
 
