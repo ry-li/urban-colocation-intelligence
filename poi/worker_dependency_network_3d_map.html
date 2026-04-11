@@ -156,12 +156,12 @@
   <h2>View Controls</h2>
   <p>Adjust the camera directly here, or right-drag on the map to rotate and tilt.</p>
   <div class="camera-row">
-    <div class="camera-label"><span>Tilt</span><span id="camera-pitch-value">58°</span></div>
-    <input id="camera-pitch" type="range" min="0" max="85" step="1" value="58">
+    <div class="camera-label"><span>Tilt</span><span id="camera-pitch-value">42°</span></div>
+    <input id="camera-pitch" type="range" min="0" max="85" step="1" value="42">
   </div>
   <div class="camera-row">
-    <div class="camera-label"><span>Rotation</span><span id="camera-bearing-value">18°</span></div>
-    <input id="camera-bearing" type="range" min="-180" max="180" step="1" value="18">
+    <div class="camera-label"><span>Rotation</span><span id="camera-bearing-value">0°</span></div>
+    <input id="camera-bearing" type="range" min="-180" max="180" step="1" value="0">
   </div>
   <button id="camera-reset" type="button">Reset View</button>
   <p id="selection-message" class="selection-note">All links are shown by default. Click a building to dim unrelated links while keeping its related links highlighted. Click empty map space to clear.</p>
@@ -171,11 +171,11 @@
     const container = document.getElementById('deck-container');
     const jsonInput = {
   "initialViewState": {
-    "bearing": 18.0,
+    "bearing": 0.0,
     "latitude": 51.50407825,
     "longitude": -0.017897450000000002,
-    "pitch": 58.0,
-    "zoom": 16.2
+    "pitch": 42.0,
+    "zoom": 15.5
   },
   "layers": [
     {
@@ -25007,7 +25007,7 @@
       "getElevation": "@@=properties.elevation_m",
       "getFillColor": "@@=properties.fill_color",
       "getLineColor": "@@=properties.line_color",
-      "id": "ae5e8440-d9b6-43df-8691-9f04467bd922",
+      "id": "d5910c26-49cd-46c5-9944-046331b467a7",
       "lineWidthMinPixels": 0.6,
       "opacity": 0.72,
       "pickable": true,
@@ -42230,7 +42230,7 @@
       "getTargetPosition": "@@=target_position",
       "getWidth": "@@=arc_width",
       "greatCircle": false,
-      "id": "9ca70974-5405-4567-916b-925c88ad6892",
+      "id": "5bd09542-8cb2-4a12-a146-e93defa85f61",
       "pickable": true,
       "widthMaxPixels": 3,
       "widthMinPixels": 0.4,
@@ -42261,8 +42261,8 @@
 window.deckInstance = deckInstance;
 const defaultViewState = {
   ...jsonInput.initialViewState,
-  pitch: 58,
-  bearing: 18
+  pitch: 42,
+  bearing: 0
 };
 let currentViewState = {...defaultViewState};
 let selectedBuildingId = null;
